@@ -10,16 +10,18 @@ pub struct BaseCol {
     pub mid: i64,
     pub lable_theme: String,
     pub name: String,
+    pub sex: String,
 }
 
 pub async fn insert(conn: &mut SqliteConnection, data: &Vec<BaseCol>) -> anyhow::Result<()> {
     let mut query_builder: QueryBuilder<Sqlite> =
-        QueryBuilder::new("INSERT INTO base (mid,lable_theme,name) ");
+        QueryBuilder::new("INSERT INTO base (mid,lable_theme,name,sex) ");
 
     query_builder.push_values(data.iter().take(data.len()), |mut b, user| {
         b.push_bind(user.mid)
             .push_bind(user.lable_theme.clone())
-            .push_bind(user.name.clone());
+            .push_bind(user.name.clone())
+            .push_bind(user.sex.clone());
     });
 
     let query_sql = query_builder.build();
