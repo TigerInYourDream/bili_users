@@ -1,12 +1,18 @@
-use log::info;
+use log::{error, info};
+use rand::prelude::*;
+use sqlx::{Connection, SqliteConnection};
+
 use reqwest::header::USER_AGENT;
 use tokio::fs;
 
 pub mod prepare;
 
 use serde::Deserialize;
-use std::collections::HashMap;
+use std::{collections::HashMap, time::Duration};
 
+use crate::prepare::{BaseCol, insert};
+
+#[allow(dead_code)]
 #[derive(Deserialize, Debug)]
 struct Label {
     path: String,
@@ -22,7 +28,7 @@ struct Label {
     img_label_uri_hans_static: String,
     img_label_uri_hant_static: String,
 }
-
+#[allow(dead_code)]
 #[derive(Deserialize, Debug)]
 struct Vip {
     #[serde(rename = "type")]
@@ -43,6 +49,7 @@ struct Vip {
     avatar_icon: HashMap<String, Vec<String>>,
 }
 
+#[allow(dead_code)]
 #[derive(Deserialize, Debug)]
 struct Pendant {
     pid: i32,
@@ -53,7 +60,7 @@ struct Pendant {
     image_enhance_frame: String,
     n_pid: i32,
 }
-
+#[allow(dead_code)]
 #[derive(Deserialize, Debug)]
 struct Nameplate {
     nid: i32,
@@ -63,7 +70,7 @@ struct Nameplate {
     level: String,
     condition: String,
 }
-
+#[allow(dead_code)]
 #[derive(Deserialize, Debug)]
 struct Official {
     role: i32,
@@ -72,7 +79,7 @@ struct Official {
     #[serde(rename = "type")]
     type_: i32,
 }
-
+#[allow(dead_code)]
 #[derive(Deserialize, Debug)]
 struct Attestation {
     #[serde(rename = "type")]
@@ -82,7 +89,7 @@ struct Attestation {
     icon: String,
     desc: String,
 }
-
+#[allow(dead_code)]
 #[derive(Deserialize, Debug)]
 struct ExpertInfo {
     title: String,
@@ -91,13 +98,13 @@ struct ExpertInfo {
     type_: i32,
     desc: String,
 }
-
+#[allow(dead_code)]
 #[derive(Deserialize, Debug)]
 struct Colour {
     dark: String,
     normal: String,
 }
-
+#[allow(dead_code)]
 #[derive(Deserialize, Debug)]
 struct Honours {
     mid: i32,
@@ -105,7 +112,7 @@ struct Honours {
     tags: Option<Vec<String>>,
     is_latest_100honour: i32,
 }
-
+#[allow(dead_code)]
 #[derive(Deserialize, Debug)]
 struct Data {
     mid: i32,
@@ -133,7 +140,7 @@ struct Data {
     expert_info: ExpertInfo,
     honours: Honours,
 }
-
+#[allow(dead_code)]
 #[derive(Deserialize, Debug)]
 struct CardResponse {
     code: i32,
@@ -142,27 +149,79 @@ struct CardResponse {
     data: Vec<Data>,
 }
 
+pub const BILI_MAX_CARDS: usize = 50;
+
 #[tokio::main]
 pub async fn main() -> anyhow::Result<()> {
     prepare::init_log();
 
     let ua = fs::read("./source/user_agent.txt").await?;
     let ua = String::from_utf8(ua)?;
+    let uas: Vec<&str> = ua.split('\n').collect();
+    let len = uas.len();
+
+    let distr = rand::distributions::Uniform::new_inclusive(0, len - 1);
+    let mut rng = thread_rng();
 
     let main = "https://api.vc.bilibili.com/account/v1/user/cards";
-    let url = format!("{}?{}",main,"uids=1,2,3");
-    info!("mian {:?}",url);
 
-    let client = reqwest::Client::new();
-    let r = client
-    .get(url)
-    .header(USER_AGENT,"Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36")
-    .header("Cookie", "SESSDATA=xxxxx")
-    .send()
-    .await?
-    .json::<CardResponse>()
-    .await?;
-    info!("{r:?}");
+    let mut conn = SqliteConnection::connect("./source/userinfo_db.db").await?;
+
+    let mut start_mid = 1;
+    let mut err_times = 0;
+
+    loop {
+        let mut uids: String = String::with_capacity(100);
+        for id in 0..BILI_MAX_CARDS {
+            if id == BILI_MAX_CARDS - 1 {
+                uids.push_str(&format!("{}", start_mid));
+            } else {
+                uids.push_str(&format!("{},", start_mid));
+            }
+            start_mid += 1;
+        }
+
+        let url = format!("{}?uids={}", main, uids);
+        info!("url {:}", url);
+        let random_hit: usize = rng.sample(distr);
+        info!("uas {:}", uas[random_hit]);
+        let client = reqwest::Client::new();
+        let r = client
+            .get(url.clone())
+            .header(USER_AGENT, uas[random_hit])
+            .header("Cookie", "SESSDATA=xxxxx")
+            .send()
+            .await?
+            .json::<CardResponse>()
+            .await?;
+
+        let mut base_data = Vec::with_capacity(50);
+        for data in &r.data {
+            let lt = &data.vip.label.label_theme;
+            let mid = data.mid;
+            let name = &data.name;
+            info!("{} {} {}", mid, name, lt);
+            let col =  BaseCol { mid, lable_theme: lt.clone(), name: name.clone() };
+            base_data.push(col);
+        }
+
+        insert(&mut conn, &base_data).await?;
+
+        if r.data.len() < 42 {
+            err_times += 1;
+        }
+
+        if err_times > 10 {
+            error!(
+                "err_times > 10 stop the program start_mid is {:?}",
+                start_mid
+            );
+            break;
+        }
+
+        tokio::time::sleep(Duration::from_secs(1)).await;
+    }
+
     // label_theme
 
     Ok(())
