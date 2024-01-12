@@ -18,3 +18,4 @@ md5 = "0.7.0"
 jsonpath-rust = "0.4.0"
 rand = "0.8.5"
 sqlx = { version = "0.7", features = ["runtime-tokio", "tls-native-tls" , "sqlite"] }
+futures = "0.3.30"

@@ -1,4 +1,5 @@
 use log::{error, info};
+use prepare::last_mid;
 use rand::prelude::*;
 use sqlx::{Connection, SqliteConnection};
 
@@ -10,7 +11,7 @@ pub mod prepare;
 use serde::Deserialize;
 use std::{collections::HashMap, time::Duration};
 
-use crate::prepare::{BaseCol, insert};
+use crate::prepare::{insert, BaseCol};
 
 #[allow(dead_code)]
 #[derive(Deserialize, Debug)]
@@ -58,6 +59,7 @@ struct Pendant {
     expire: i32,
     image_enhance: String,
     image_enhance_frame: String,
+    #[serde(skip)]
     n_pid: i32,
 }
 #[allow(dead_code)]
@@ -115,7 +117,7 @@ struct Honours {
 #[allow(dead_code)]
 #[derive(Deserialize, Debug)]
 struct Data {
-    mid: i32,
+    mid: i64,
     name: String,
     sex: String,
     face: String,
@@ -165,9 +167,9 @@ pub async fn main() -> anyhow::Result<()> {
 
     let main = "https://api.vc.bilibili.com/account/v1/user/cards";
 
-    let mut conn = SqliteConnection::connect("./source/userinfo_db.db").await?;
+    let mut conn = SqliteConnection::connect("./source/userinfo_db").await?;
 
-    let mut start_mid = 1;
+    let mut start_mid = last_mid(&mut conn).await?;
     let mut err_times = 0;
 
     loop {
@@ -200,8 +202,12 @@ pub async fn main() -> anyhow::Result<()> {
             let lt = &data.vip.label.label_theme;
             let mid = data.mid;
             let name = &data.name;
-            info!("{} {} {}", mid, name, lt);
-            let col =  BaseCol { mid, lable_theme: lt.clone(), name: name.clone() };
+            let col = BaseCol {
+                mid,
+                lable_theme: lt.clone(),
+                name: name.clone(),
+            };
+            info!("{:?}", col);
             base_data.push(col);
         }
 
