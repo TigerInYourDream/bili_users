@@ -1,8 +1,13 @@
-use futures::TryStreamExt;
 use sqlx::{QueryBuilder, Sqlite, SqliteConnection};
+use tracing::Level;
+use tracing_subscriber::FmtSubscriber;
 
 pub fn init_log() {
-    simple_logger::SimpleLogger::new().env().init().unwrap();
+    let subscriber = FmtSubscriber::builder()
+        .with_max_level(Level::INFO)
+        .finish();
+
+    tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
 }
 
 #[derive(sqlx::FromRow, Debug)]
@@ -30,22 +35,34 @@ pub async fn insert(conn: &mut SqliteConnection, data: &Vec<BaseCol>) -> anyhow:
 }
 
 pub async fn last_mid(conn: &mut SqliteConnection) -> anyhow::Result<i64> {
-    let mut rows = sqlx::query_as::<_, BaseCol>(
-        "SELECT *
-    FROM base
-    ORDER BY mid DESC
-    LIMIT 1",
+    let rows: (String,) = sqlx::query_as(
+        "SELECT mid
+        FROM base
+        ORDER BY mid DESC
+        LIMIT 1",
     )
-    .fetch(conn);
+    .fetch_one(conn)
+    .await?;
+    let mid = rows.0.parse::<i64>()?;
+    Ok(mid)
+}
 
-    if let Ok(last) = rows.try_next().await {
-        let mid = match last {
-            Some(l) => Ok(l.mid),
-            None => Ok(1),
-        };
+#[cfg(test)]
+mod test {
+    use sqlx::{Connection, SqliteConnection};
 
-        return mid;
+    #[tokio::test]
+    async fn test_last_mid() -> anyhow::Result<()> {
+        let mut conn = SqliteConnection::connect("./source/userinfo_db").await?;
+        let rows: (String,) = sqlx::query_as(
+            "SELECT mid
+            FROM base
+            ORDER BY mid DESC
+            LIMIT 1",
+        )
+        .fetch_one(&mut conn)
+        .await?;
+        println!("{rows:?}");
+        Ok(())
     }
-
-    Ok(1)
 }

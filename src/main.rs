@@ -1,6 +1,7 @@
-use log::{error, info};
+use prepare::last_mid;
 use rand::prelude::*;
 use sqlx::{Connection, SqliteConnection};
+use tracing::{error, info};
 
 use reqwest::header::USER_AGENT;
 use tokio::fs;
@@ -170,9 +171,9 @@ pub async fn main() -> anyhow::Result<()> {
 
     let mut conn = SqliteConnection::connect("./source/userinfo_db").await?;
 
-    let mut start_mid = 1; 
+    let mut start_mid = last_mid(&mut conn).await?;
+    info!("start with last max mid {start_mid:?}");
     let mut err_times = 0;
-
     loop {
         let mut uids: String = String::with_capacity(100);
         for id in 0..BILI_MAX_CARDS {
@@ -185,12 +186,11 @@ pub async fn main() -> anyhow::Result<()> {
         }
 
         let url = format!("{}?uids={}", main, uids);
-        info!("url {:}", url);
+        info!("url --> {:}", url);
         let random_hit: usize = rng.sample(distr);
-        info!("uas {:}", uas[random_hit]);
         let client = reqwest::Client::new();
-        let r = client
-            .get(url.clone())
+        let response = client
+            .get(url)
             .header(USER_AGENT, uas[random_hit])
             .header("Cookie", "SESSDATA=xxxxx")
             .send()
@@ -198,7 +198,7 @@ pub async fn main() -> anyhow::Result<()> {
             .json::<CardResponse>()
             .await;
 
-        match r {
+        match response {
             Ok(r) => {
                 let mut base_data = Vec::with_capacity(50);
                 for data in &r.data {
@@ -206,7 +206,12 @@ pub async fn main() -> anyhow::Result<()> {
                     let mid = data.mid;
                     let name = &data.name;
                     let sex = &data.sex;
-                    let col = BaseCol {mid,lable_theme:lt.clone(),name:name.clone(), sex: sex.clone() };
+                    let col = BaseCol {
+                        mid,
+                        lable_theme: lt.clone(),
+                        name: name.clone(),
+                        sex: sex.clone(),
+                    };
                     info!("{:?}", col);
                     base_data.push(col);
                 }
@@ -221,7 +226,7 @@ pub async fn main() -> anyhow::Result<()> {
 
                 if err_times > 50 {
                     error!(
-                        "err_times > 100 stop the program start_mid is {:?}",
+                        "err_times > 50 stop the program start_mid is {:?}",
                         start_mid
                     );
                     break;
@@ -232,10 +237,8 @@ pub async fn main() -> anyhow::Result<()> {
                 error!("{:?}", e);
             }
         }
-
         tokio::time::sleep(Duration::from_secs(1)).await;
     }
-    // label_theme
 
     Ok(())
 }
