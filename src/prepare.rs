@@ -35,7 +35,7 @@ pub async fn insert(conn: &mut SqliteConnection, data: &Vec<BaseCol>) -> anyhow:
 }
 
 pub async fn last_mid(conn: &mut SqliteConnection) -> anyhow::Result<i64> {
-    let rows: (String,) = sqlx::query_as(
+    let rows: (i64,) = sqlx::query_as(
         "SELECT mid
         FROM base
         ORDER BY mid DESC
@@ -43,8 +43,7 @@ pub async fn last_mid(conn: &mut SqliteConnection) -> anyhow::Result<i64> {
     )
     .fetch_one(conn)
     .await?;
-    let mid = rows.0.parse::<i64>()?;
-    Ok(mid)
+    Ok(rows.0)
 }
 
 #[cfg(test)]
@@ -54,7 +53,7 @@ mod test {
     #[tokio::test]
     async fn test_last_mid() -> anyhow::Result<()> {
         let mut conn = SqliteConnection::connect("./source/userinfo_db").await?;
-        let rows: (String,) = sqlx::query_as(
+        let rows: (i64,) = sqlx::query_as(
             "SELECT mid
             FROM base
             ORDER BY mid DESC

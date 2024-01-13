@@ -6,6 +6,7 @@ use tracing::{error, info};
 use reqwest::header::USER_AGENT;
 use tokio::fs;
 
+pub mod larkbot;
 pub mod prepare;
 
 use serde::Deserialize;

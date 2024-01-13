@@ -19,3 +19,6 @@ jsonpath-rust = "0.4.0"
 rand = "0.8.5"
 sqlx = { version = "0.7", features = ["runtime-tokio", "tls-native-tls" , "sqlite"] }
 futures = "0.3.30"
+base64ct = { version = "1.6.0", features = ["alloc"] }
+hmac = "0.12.1"
+sha2 = "0.10.8"
