@@ -1,3 +1,4 @@
+use clap::Parser;
 use prepare::last_mid;
 use rand::prelude::*;
 use sqlx::{Connection, SqliteConnection};
@@ -12,7 +13,7 @@ pub mod prepare;
 use serde::Deserialize;
 use std::{collections::HashMap, time::Duration};
 
-use crate::prepare::{insert, BaseCol};
+use crate::prepare::{insert, BaseCol, ClapArgs};
 
 #[allow(dead_code)]
 #[derive(Deserialize, Debug)]
@@ -159,6 +160,9 @@ pub const BILI_MAX_CARDS: usize = 50;
 #[tokio::main]
 pub async fn main() -> anyhow::Result<()> {
     prepare::init_log();
+    let args = ClapArgs::parse();
+    let bot = larkbot::Bot::new(&args.url, &args.token);
+    bot.send("start program").await?;
 
     let ua = fs::read("./source/user_agent.txt").await?;
     let ua = String::from_utf8(ua)?;
@@ -240,6 +244,8 @@ pub async fn main() -> anyhow::Result<()> {
         }
         tokio::time::sleep(Duration::from_secs(1)).await;
     }
+
+    bot.send("end program").await?;
 
     Ok(())
 }

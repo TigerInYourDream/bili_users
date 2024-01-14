@@ -19,8 +19,8 @@ pub struct BotMsg {
 }
 pub type HmacSha256 = Hmac<Sha256>;
 
-fn sign_(ts: u64) -> String {
-    let security = &format!("{}\n{}", ts, "$SECURITY");
+fn sign_(ts: u64,token :&str) -> String {
+    let security = &format!("{}\n{}", ts, token);
     let hasher =
         HmacSha256::new_from_slice(security.as_bytes()).expect("HMAC can take key of any size");
     let result = hasher.finalize();
@@ -29,12 +29,12 @@ fn sign_(ts: u64) -> String {
 }
 
 impl BotMsg {
-    pub fn new_msg(content: Content) -> Self {
+    fn new_msg(content: Content, token: &str) -> Self {
         let ts = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("Time went backwards")
             .as_secs();
-        let sign = sign_(ts);
+        let sign = sign_(ts,token);
         Self {
             timestamp: ts.to_string(),
             msg_type: "text".to_string(),
@@ -42,34 +42,28 @@ impl BotMsg {
             sign,
         }
     }
+
 }
-pub struct Bot {
+pub struct Bot<'a> {
     client: reqwest::Client,
+    url: &'a str,
+    token: &'a str,
 }
 
-impl Default for Bot {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl Bot {
-    pub fn new() -> Self {
+impl<'a> Bot<'a> {
+    pub fn new(url: &'a str, token: &'a str) -> Self {
         let client = reqwest::Client::new();
-        Self { client }
+        Self { client, url, token }
     }
 
     pub async fn send(&self, content: &str) -> anyhow::Result<String> {
         let msg = BotMsg::new_msg(Content {
             text: content.to_string(),
-        });
-
-        let url =
-            "https://open.feishu.cn/open-apis/bot/v2/hook/xxxxxxxx";
+        }, self.token);
 
         let response = self
             .client
-            .post(url)
+            .post(self.url)
             .header(reqwest::header::CONTENT_TYPE, "application/json")
             .json(&msg)
             .send()
@@ -83,12 +77,15 @@ impl Bot {
 mod test {
 
     use crate::larkbot::{sign_, Bot};
-        use std::{error::Error, time::SystemTime};
+    use std::{error::Error, time::SystemTime};
 
     #[tokio::test]
     pub async fn test_bot() -> Result<(), Box<dyn Error>> {
-        let bot = Bot::new();
-        let text =  bot.send("hello").await?;
+        let bot = Bot::new(
+            "url",
+            "token",
+        );
+        let text = bot.send("life time hello").await?;
         println!("{:?}", text);
         Ok(())
     }
@@ -100,7 +97,7 @@ mod test {
             .unwrap()
             .as_secs();
         println!("{:?}", ts);
-        let sign = sign_(ts);
+        let sign = sign_(ts, "SECURITY");
         println!("{:?}", sign);
     }
 }
