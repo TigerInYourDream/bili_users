@@ -1,4 +1,4 @@
-use clap::{command, arg, Parser};
+use clap::{arg, command, Parser};
 use sqlx::{QueryBuilder, Sqlite, SqliteConnection};
 use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
@@ -46,7 +46,6 @@ pub async fn last_mid(conn: &mut SqliteConnection) -> anyhow::Result<i64> {
     .await?;
     Ok(rows.0)
 }
-
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]

@@ -19,7 +19,7 @@ pub struct BotMsg {
 }
 pub type HmacSha256 = Hmac<Sha256>;
 
-fn sign_(ts: u64,token :&str) -> String {
+fn sign_(ts: u64, token: &str) -> String {
     let security = &format!("{}\n{}", ts, token);
     let hasher =
         HmacSha256::new_from_slice(security.as_bytes()).expect("HMAC can take key of any size");
@@ -34,7 +34,7 @@ impl BotMsg {
             .duration_since(UNIX_EPOCH)
             .expect("Time went backwards")
             .as_secs();
-        let sign = sign_(ts,token);
+        let sign = sign_(ts, token);
         Self {
             timestamp: ts.to_string(),
             msg_type: "text".to_string(),
@@ -42,7 +42,6 @@ impl BotMsg {
             sign,
         }
     }
-
 }
 pub struct Bot<'a> {
     client: reqwest::Client,
@@ -57,9 +56,12 @@ impl<'a> Bot<'a> {
     }
 
     pub async fn send(&self, content: &str) -> anyhow::Result<String> {
-        let msg = BotMsg::new_msg(Content {
-            text: content.to_string(),
-        }, self.token);
+        let msg = BotMsg::new_msg(
+            Content {
+                text: content.to_string(),
+            },
+            self.token,
+        );
 
         let response = self
             .client
@@ -81,10 +83,7 @@ mod test {
 
     #[tokio::test]
     pub async fn test_bot() -> Result<(), Box<dyn Error>> {
-        let bot = Bot::new(
-            "url",
-            "token",
-        );
+        let bot = Bot::new("url", "token");
         let text = bot.send("life time hello").await?;
         println!("{:?}", text);
         Ok(())

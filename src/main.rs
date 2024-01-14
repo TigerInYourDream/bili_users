@@ -199,11 +199,19 @@ pub async fn main() -> anyhow::Result<()> {
             .header(USER_AGENT, uas[random_hit])
             .header("Cookie", "SESSDATA=xxxxx")
             .send()
-            .await?
-            .json::<CardResponse>()
             .await;
 
-        match response {
+        let response = match response {
+            Ok(r) => r,
+            Err(e) => {
+                error!("{:?}", e);
+                break;
+            }
+        };
+
+        let json_data = response.json::<CardResponse>().await;
+
+        match json_data {
             Ok(r) => {
                 let mut base_data = Vec::with_capacity(50);
                 for data in &r.data {
