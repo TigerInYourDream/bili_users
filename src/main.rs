@@ -9,6 +9,7 @@ use tokio::fs;
 
 pub mod larkbot;
 pub mod prepare;
+pub mod driver;
 
 use serde::Deserialize;
 use std::{collections::HashMap, time::Duration};
