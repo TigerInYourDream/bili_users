@@ -7,9 +7,9 @@ use tracing::{error, info};
 use reqwest::header::USER_AGENT;
 use tokio::fs;
 
+pub mod driver;
 pub mod larkbot;
 pub mod prepare;
-pub mod driver;
 
 use serde::Deserialize;
 use std::{collections::HashMap, time::Duration};
